@@ -32,11 +32,11 @@ fn poll_client(_ctx: zmq::Context, socket: zmq::Socket) {
     // TODO: we should use `poll::poll()` here as well.
     for i in 0..10 {
         let payload = format!("message {}", i);
-        socket.send_str(&payload, 0).unwrap();
+        socket.send(&payload, 0).unwrap();
         let reply = socket.recv_msg(0).unwrap();
         assert_eq!(payload.as_bytes(), &reply[..]);
     }
-    socket.send_str("", 0).unwrap();
+    socket.send("", 0).unwrap();
     let last = socket.recv_msg(0).unwrap();
     assert_eq!(b"", &last[..]);
 }
@@ -59,7 +59,7 @@ impl<'a> PollState<'a> {
 
     /// Wait for one of `events` to happen.
     fn wait(&mut self, events: zmq::PollEvents) {
-        while (self.events() & events) == 0 {
+        while !(self.events().intersects(events)) {
             debug!("polling");
             let fds = &mut self.fds;
             poll::poll(fds, -1).unwrap();
@@ -93,7 +93,7 @@ fn poll_worker(_ctx: zmq::Context, socket: zmq::Socket) {
             Some(msg) => {
                 state.wait(zmq::POLLOUT);
                 let done = msg.len() == 0;
-                socket.send_msg(msg, zmq::DONTWAIT).unwrap();
+                socket.send(msg, zmq::DONTWAIT).unwrap();
                 if done {
                     break;
                 }

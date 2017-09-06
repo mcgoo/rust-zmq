@@ -1,6 +1,6 @@
-#![crate_name = "rtdealer"]
+#![crate_name = "rtreq"]
 
-//! Router-to-dealer example
+//! Router-to-request example
 
 extern crate zmq;
 extern crate rand;
@@ -12,12 +12,16 @@ use std::thread;
 
 // Inefficient but terse base16 encoder
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|x| format!("{:02x}", x)).collect::<Vec<_>>().join("")
+    bytes
+        .iter()
+        .map(|x| format!("{:02x}", x))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn worker_task() {
     let context = zmq::Context::new();
-    let worker = context.socket(zmq::DEALER).unwrap();
+    let worker = context.socket(zmq::REQ).unwrap();
     let mut rng = rand::thread_rng();
     let identity: Vec<_> = (0..10).map(|_| rand::random::<u8>()).collect();
     worker.set_identity(&identity).unwrap();
@@ -26,11 +30,9 @@ fn worker_task() {
     let mut total = 0;
     loop {
         // Tell the broker we're ready for work
-        worker.send("", SNDMORE).unwrap();
         worker.send("Hi boss!", 0).unwrap();
 
         // Get workload from broker, until finished
-        worker.recv_bytes(0).unwrap();  // envelope delimiter
         let workload = worker.recv_string(0).unwrap().unwrap();
         if workload == "Fired!" {
             println!("Worker {} completed {} tasks", hex(&identity), total);
@@ -56,9 +58,7 @@ fn main() {
     // context and conceptually acts as a separate process.
     let mut thread_pool = Vec::new();
     for _ in 0..worker_pool_size {
-        let child = thread::spawn(move || {
-            worker_task();
-        });
+        let child = thread::spawn(move || { worker_task(); });
         thread_pool.push(child);
     }
 

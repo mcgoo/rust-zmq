@@ -45,7 +45,7 @@ test!(test_poll_tcp, {
 
 fn send_message(_ctx: zmq::Context, socket: zmq::Socket)
 {
-    socket.send(b"Message1", 0).unwrap();
+    socket.send("Message1", 0).unwrap();
 }
 
 fn check_poll(_ctx: zmq::Context, pull_socket: zmq::Socket) {

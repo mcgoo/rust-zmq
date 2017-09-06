@@ -24,7 +24,7 @@ fn main() {
 
     // Process messages from both sockets
     // We prioritize traffic from the task ventilator
-    let mut msg = zmq::Message::new().unwrap();
+    let mut msg = zmq::Message::new();
     loop {
         loop {
             if receiver.recv(&mut msg, zmq::DONTWAIT).is_err() {

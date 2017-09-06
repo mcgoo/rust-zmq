@@ -5,7 +5,7 @@ use std::os::raw::c_void;
 use std::{mem, ptr, str};
 use std::result;
 
-use super::Result;
+use super::{Result, PollEvents};
 
 pub trait Getter where Self: Sized {
     fn get(sock: *mut c_void, opt: c_int) -> Result<Self>;
@@ -42,8 +42,7 @@ getsockopt_num!(c_uint, u32);
 getsockopt_num!(int64_t, i64);
 getsockopt_num!(uint64_t, u64);
 
-pub fn get_string(sock: *mut c_void, opt: c_int, size: size_t,
-                  remove_nulbyte: bool) -> Result<result::Result<String, Vec<u8>>> {
+pub fn get_bytes(sock: *mut c_void, opt: c_int, size: size_t) -> Result<Vec<u8>> {
     let mut size = size;
     let mut value = vec![0u8; size];
 
@@ -54,10 +53,17 @@ pub fn get_string(sock: *mut c_void, opt: c_int, size: size_t,
             value.as_mut_ptr() as *mut c_void,
             &mut size)
     });
-    if remove_nulbyte {
-        size -= 1;
-    }
     value.truncate(size);
+    Ok(value)
+}
+
+pub fn get_string(sock: *mut c_void, opt: c_int, size: size_t, remove_nulbyte: bool)
+                  -> Result<result::Result<String, Vec<u8>>> {
+    let mut value = try!(get_bytes(sock, opt, size));
+
+    if remove_nulbyte {
+        value.pop();
+    }
     Ok(String::from_utf8(value).map_err(|e| e.into_bytes()))
 }
 
@@ -130,6 +136,12 @@ impl<'a> Setter for &'a [u8] {
             )
         });
         Ok(())
+    }
+}
+
+impl Getter for PollEvents {
+    fn get(sock: *mut c_void, opt: c_int) -> Result<Self> {
+        get::<c_int>(sock, opt).map(|bits| PollEvents::from_bits_truncate(bits as i16))
     }
 }
 

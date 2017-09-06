@@ -29,24 +29,24 @@ fn create_socketpair() -> (Socket, Socket) {
 
 test!(test_exchanging_messages, {
     let (sender, receiver) = create_socketpair();
-    sender.send_msg(Message::from_slice(b"foo").unwrap(), 0).unwrap();
+    sender.send("foo", 0).unwrap();
     let msg = receiver.recv_msg(0).unwrap();
     assert_eq!(&msg[..], b"foo");
     assert_eq!(msg.as_str(), Some("foo"));
     assert_eq!(format!("{:?}", msg), "[102, 111, 111]");
 
-    receiver.send(b"bar", 0).unwrap();
-    let mut msg = Message::with_capacity(1).unwrap();
+    receiver.send("bar", 0).unwrap();
+    let mut msg = Message::with_capacity(1);
     sender.recv(&mut msg, 0).unwrap();
     assert_eq!(&msg[..], b"bar");
 });
 
 test!(test_exchanging_bytes, {
     let (sender, receiver) = create_socketpair();
-    sender.send(b"bar", 0).unwrap();
+    sender.send("bar", 0).unwrap();
     assert_eq!(receiver.recv_bytes(0).unwrap(), b"bar");
 
-    receiver.send(b"a quite long string", 0).unwrap();
+    receiver.send("a quite long string", 0).unwrap();
     let mut buf = [0_u8; 10];
     sender.recv_into(&mut buf, 0).unwrap();  // this should truncate the message
     assert_eq!(&buf[..], b"a quite lo");
@@ -54,11 +54,11 @@ test!(test_exchanging_bytes, {
 
 test!(test_exchanging_strings, {
     let (sender, receiver) = create_socketpair();
-    sender.send_str("bäz", 0).unwrap();
+    sender.send("bäz", 0).unwrap();
     assert_eq!(receiver.recv_string(0).unwrap().unwrap(), "bäz");
 
     // non-UTF8 strings -> get an Err with bytes when receiving
-    receiver.send(b"\xff\xb7", 0).unwrap();
+    receiver.send(b"\xff\xb7".as_ref(), 0).unwrap();
     let result = sender.recv_string(0).unwrap();
     assert_eq!(result, Err(vec![0xff, 0xb7]));
 });
@@ -67,12 +67,12 @@ test!(test_exchanging_multipart, {
     let (sender, receiver) = create_socketpair();
 
     // convenience API
-    sender.send_multipart(&[b"foo", b"bar"], 0).unwrap();
+    sender.send_multipart(&["foo", "bar"], 0).unwrap();
     assert_eq!(receiver.recv_multipart(0).unwrap(), vec![b"foo", b"bar"]);
 
     // manually
-    receiver.send(b"foo", SNDMORE).unwrap();
-    receiver.send(b"bar", 0).unwrap();
+    receiver.send("foo", SNDMORE).unwrap();
+    receiver.send("bar", 0).unwrap();
     let msg1 = sender.recv_msg(0).unwrap();
     assert!(msg1.get_more());
     assert!(sender.get_rcvmore().unwrap());
@@ -90,7 +90,7 @@ test!(test_polling, {
     assert_eq!(receiver.poll(POLLIN, 1000).unwrap(), 0);
 
     // send message
-    sender.send(b"Hello!", 0).unwrap();
+    sender.send("Hello!", 0).unwrap();
     let mut poll_items = vec![receiver.as_poll_item(POLLIN)];
     assert_eq!(poll(&mut poll_items, 1000).unwrap(), 1);
     assert_eq!(poll_items[0].get_revents(), POLLIN);
@@ -120,7 +120,7 @@ test!(test_zmq_error, {
     let sock = ctx.socket(SocketType::REP).unwrap();
 
     // cannot send from REP unless we received a message first
-    let err = sock.send(b"...", 0).unwrap_err();
+    let err = sock.send("...", 0).unwrap_err();
     assert_eq!(err, Error::EFSM);
 
     // ZMQ error strings might not be guaranteed, so we'll not check
@@ -141,8 +141,8 @@ test!(test_into_io_error, {
 #[cfg(ZMQ_HAS_CURVE = "1")]
 test!(test_curve_keypair, {
     let keypair = CurveKeyPair::new().unwrap();
-    assert!(keypair.public_key.len() == 40);
-    assert!(keypair.secret_key.len() == 40);
+    assert!(keypair.public_key.len() == 32);
+    assert!(keypair.secret_key.len() == 32);
 });
 
 test!(test_get_socket_type, {
@@ -210,7 +210,7 @@ test!(test_getset_identity, {
     let ctx = Context::new();
     let sock = ctx.socket(REQ).unwrap();
     sock.set_identity(b"moo").unwrap();
-    assert_eq!(sock.get_identity().unwrap().unwrap(), "moo");
+    assert_eq!(sock.get_identity().unwrap(), b"moo");
 });
 
 test!(test_subscription, {
@@ -466,24 +466,27 @@ test!(test_getset_curve_server, {
 test!(test_getset_curve_publickey, {
     let ctx = Context::new();
     let sock = ctx.socket(REQ).unwrap();
-    sock.set_curve_publickey("FX5b8g5ZnOk7$Q}^)Y&?.v3&MIe+]OU7DTKynkUL").unwrap();
-    assert_eq!(sock.get_curve_publickey().unwrap().unwrap(), "FX5b8g5ZnOk7$Q}^)Y&?.v3&MIe+]OU7DTKynkUL");
+    let key = z85_decode("FX5b8g5ZnOk7$Q}^)Y&?.v3&MIe+]OU7DTKynkUL").unwrap();
+    sock.set_curve_publickey(&key).unwrap();
+    assert_eq!(sock.get_curve_publickey().unwrap(), key);
 });
 
 #[cfg(ZMQ_HAS_CURVE = "1")]
 test!(test_getset_curve_secretkey, {
     let ctx = Context::new();
     let sock = ctx.socket(REQ).unwrap();
-    sock.set_curve_secretkey("s9N%S3*NKSU$6pUnpBI&K5HBd[]G$Y3yrK?mhdbS").unwrap();
-    assert_eq!(sock.get_curve_secretkey().unwrap().unwrap(), "s9N%S3*NKSU$6pUnpBI&K5HBd[]G$Y3yrK?mhdbS");
+    let key = z85_decode("s9N%S3*NKSU$6pUnpBI&K5HBd[]G$Y3yrK?mhdbS").unwrap();
+    sock.set_curve_secretkey(&key).unwrap();
+    assert_eq!(sock.get_curve_secretkey().unwrap(), key);
 });
 
 #[cfg(ZMQ_HAS_CURVE = "1")]
 test!(test_getset_curve_serverkey, {
     let ctx = Context::new();
     let sock = ctx.socket(REQ).unwrap();
-    sock.set_curve_serverkey("FX5b8g5ZnOk7$Q}^)Y&?.v3&MIe+]OU7DTKynkUL").unwrap();
-    assert_eq!(sock.get_curve_serverkey().unwrap().unwrap(), "FX5b8g5ZnOk7$Q}^)Y&?.v3&MIe+]OU7DTKynkUL");
+    let key = z85_decode("FX5b8g5ZnOk7$Q}^)Y&?.v3&MIe+]OU7DTKynkUL").unwrap();
+    sock.set_curve_serverkey(&key).unwrap();
+    assert_eq!(sock.get_curve_serverkey().unwrap(), key);
 });
 
 
@@ -501,7 +504,7 @@ test!(test_disconnect, {
     let ep = receiver.get_last_endpoint().unwrap().unwrap();
     sender.disconnect(&ep).unwrap();
     // And check that the message can no longer be sent
-    assert_eq!(Error::EAGAIN, sender.send_msg(Message::from_slice(b"foo").unwrap(), DONTWAIT).unwrap_err());
+    assert_eq!(Error::EAGAIN, sender.send("foo", DONTWAIT).unwrap_err());
 });
 
 test!(test_disconnect_err, {

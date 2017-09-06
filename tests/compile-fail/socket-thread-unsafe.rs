@@ -15,6 +15,6 @@ fn main() {
     let t = thread::spawn(move || {  //~ ERROR trait bound
         t!(s.bind("tcp://127.0.0.1:12345"))
     });
-    socket.send_str("ABC", 0);
+    socket.send("ABC", 0);
     t.join().unwrap();
 }

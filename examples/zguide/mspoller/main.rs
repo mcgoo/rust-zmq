@@ -18,7 +18,7 @@ fn main() {
 
 
     // Process messages from both sockets
-    let mut msg = zmq::Message::new().unwrap();
+    let mut msg = zmq::Message::new();
     loop {
         let mut items = [
             receiver.as_poll_item(zmq::POLLIN),

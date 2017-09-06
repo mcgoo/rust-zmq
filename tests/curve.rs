@@ -30,14 +30,14 @@ fn create_socketpair() -> (Socket, Socket) {
 
 test!(test_curve_messages, {
     let (sender, receiver) = create_socketpair();
-    sender.send_msg(Message::from_slice(b"foo").unwrap(), 0).unwrap();
+    sender.send("foo", 0).unwrap();
     let msg = receiver.recv_msg(0).unwrap();
     assert_eq!(&msg[..], b"foo");
     assert_eq!(msg.as_str(), Some("foo"));
     println!("this is it {0}", msg.as_str().unwrap());
     assert_eq!(format!("{:?}", msg), "[102, 111, 111]");
-    receiver.send(b"bar", 0).unwrap();
-    let mut msg = Message::with_capacity(1).unwrap();
+    receiver.send("bar", 0).unwrap();
+    let mut msg = Message::with_capacity(1);
     sender.recv(&mut msg, 0).unwrap();
     assert_eq!(&msg[..], b"bar");
 });

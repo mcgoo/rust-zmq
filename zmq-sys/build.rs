@@ -4,7 +4,6 @@ extern crate metadeps;
 extern crate vcpkg;
 
 use std::env;
-use std::fs;
 use std::path::Path;
 
 fn prefix_dir(env_name: &str, dir: &str) -> Option<String> {
@@ -49,12 +48,12 @@ fn try_vcpkg() -> bool {
 
 #[cfg(target_env="msvc")]
 fn try_vcpkg() -> bool {
-    match vcpkg::Config::new().probe("zeromq") {
+    match vcpkg::probe_package("zeromq") {
         Err(e) => {
             println!("vcpkg did not find zeromq: {}", e);
             false
         }
-        Ok(lib_config) => {
+        Ok(_) => {
             println!("cargo:rustc-link-lib=iphlpapi");
             true
         }

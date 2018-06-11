@@ -48,7 +48,7 @@ fn try_vcpkg() -> bool {
 
 #[cfg(target_env="msvc")]
 fn try_vcpkg() -> bool {
-    match  vcpkg::Config::new().probe2("zeromq") {
+    match  vcpkg::Config::new().find_package("zeromq") {
         Err(e) => {
             println!("vcpkg did not find zeromq: {}", e);
             false

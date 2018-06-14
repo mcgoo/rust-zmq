@@ -19,8 +19,7 @@ libc = "0.2.15"
 metadeps = "1"
 
 [target.'cfg(target_env = "msvc")'.build-dependencies]
-# will require vcpkg = "0.2.3"
-vcpkg = { git = "https://github.com/mcgoo/vcpkg-rs", branch = "master" }
+vcpkg = "0.2.4"
 
 [package.metadata.pkg-config]
 libzmq = "3.2"
